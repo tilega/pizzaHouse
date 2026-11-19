@@ -3,16 +3,26 @@ import customtkinter as ctk
 from tkinter import messagebox
 
 from database import initialize_database
-from people_db import initialize_people_database, people_counts
+from people_db import initialize_people_database
+from procurement_db import initialize_procurement_database
+from orders_db import initialize_orders_database
+from ui.procurement_page import render_procurement_page
+from ui.orders_page import render_orders_page
+from ui.home_page import render_home_page
 from ui.people_page import render_customers_page, render_employees_page
 from ui.menu_page import render_menu_page
 from ui.ingredients_page import render_ingredients_page
 from ui.theme import COLORS
+from auth_db import initialize_auth_database, authenticate, register
+from ui.client_pages import render_client_menu, render_cart, render_history, render_account
 
 
 # Создаёт pizza_house.db при первом запуске. При следующих запусках данные сохраняются.
 initialize_database()
 initialize_people_database()
+initialize_procurement_database()
+initialize_orders_database()
+initialize_auth_database()
 
 ctk.set_appearance_mode("light")
 
@@ -61,7 +71,7 @@ content = ctk.CTkFrame(
 )
 content.pack(side="left", fill="both", expand=True)
 
-pages = [
+admin_page_names = [
     "Головна",
     "Замовлення",
     "Меню",
@@ -71,7 +81,12 @@ pages = [
     "Працівники"
 ]
 
+client_page_names = ["Меню", "Кошик", "Історія замовлень", "Акаунт"]
+guest_page_names = ["Меню", "Кошик"]
+pages = admin_page_names + [p for p in client_page_names if p not in admin_page_names]
 buttons = {}
+cart = {}
+customer_id = None
 current_role = None
 current_user = None
 
@@ -83,8 +98,16 @@ admin_pages = {
     "Працівники"
 }
 
+def update_current_login(login):
+    global current_user
+    current_user = login
+    role_label.configure(text=f'Користувач: {login}')
+
+
 def show_page(page):
-    if current_role != "admin" and page in admin_pages:
+    allowed = admin_page_names if current_role == "admin" else (
+        guest_page_names if current_role == "guest" else client_page_names)
+    if page not in allowed:
         return
 
     # Подсветка активного раздела
@@ -114,164 +137,22 @@ def show_page(page):
     ).pack(anchor="w", padx=30, pady=(30, 8))
 
     if page == "Головна":
-        ctk.CTkLabel(
-            content,
-            text="Оберіть розділ для роботи з системою",
-            text_color=COLORS["muted"]
-        ).pack(anchor="w", padx=30)
-
-        # Контейнер карточек
-        cards_frame = ctk.CTkFrame(
-            content,
-            fg_color="transparent"
-        )
-        cards_frame.pack(
-            fill="x",
-            padx=25,
-            pady=(25, 0)
-        )
-
-        # Кількість людей береться з SQLite; замовлення поки демонстраційні.
-        counts = people_counts()
-        stats = [
-            ("Нові замовлення", "3", COLORS["card_green"]),
-            ("Всього замовлень", "128", COLORS["card_blue"]),
-            ("Користувачі", str(counts["customers"]), COLORS["card_purple"]),
-            ("Працівники", str(counts["employees"]), COLORS["card_orange"])
-        ]
-
-        for i, (name, value, color) in enumerate(stats):
-            cards_frame.grid_columnconfigure(
-                i,
-                weight=1,
-                uniform="cards"
-            )
-
-            card = ctk.CTkFrame(
-                cards_frame,
-                fg_color=color,
-                corner_radius=10,
-                height=105
-            )
-            card.grid(
-                row=0,
-                column=i,
-                padx=5,
-                sticky="nsew"
-            )
-            card.grid_propagate(False)
-
-            ctk.CTkLabel(
-                card,
-                text=name,
-                font=("Arial", 12),
-                text_color=COLORS["body_heading"]
-            ).pack(pady=(18, 5))
-
-            ctk.CTkLabel(
-                card,
-                text=value,
-                font=("Arial", 27, "bold"),
-                text_color=COLORS["navy"]
-            ).pack(pady=(0, 15))
-
-        # Таблица последних заказов
-        orders_frame = ctk.CTkFrame(
-            content,
-            fg_color="white",
-            corner_radius=10,
-            border_width=1,
-            border_color=COLORS["light_border"]
-        )
-        orders_frame.pack(
-            fill="x",
-            padx=30,
-            pady=(25, 0)
-        )
-
-        ctk.CTkLabel(
-            orders_frame,
-            text="Останні замовлення",
-            font=("Arial", 17, "bold"),
-            text_color=COLORS["navy"]
-        ).pack(
-            anchor="w",
-            padx=15,
-            pady=(15, 10)
-        )
-
-        table = ctk.CTkFrame(
-            orders_frame,
-            fg_color="transparent"
-        )
-        table.pack(
-            fill="x",
-            padx=15,
-            pady=(0, 15)
-        )
-
-        headers = [
-            "ID", "Клієнт", "Дата", "Сума", "Статус"
-        ]
-
-        for col, header in enumerate(headers):
-            table.grid_columnconfigure(col, weight=1)
-
-            ctk.CTkLabel(
-                table,
-                text=header,
-                font=("Arial", 12, "bold"),
-                text_color=COLORS["body_heading"],
-                fg_color=COLORS["header"],
-                height=35
-            ).grid(
-                row=0,
-                column=col,
-                sticky="ew"
-            )
-
-        # Тестовые заказы
-        orders = [
-            ("110", "Назар Романенко", "19.10.2026", "620", "Нове"),
-            ("109", "Ірина Савченко", "19.10.2026", "450", "Скасоване"),
-            ("108", "Владислав Поліщук", "19.10.2026", "510", "Готується"),
-            ("107", "Ольга Лисенко", "19.10.2026", "250", "Виконане"),
-            ("106", "Дмитро Кравченко", "19.10.2026", "320", "Виконане")
-        ]
-
-        status_colors = {
-            "Нове": COLORS["status_blue"],
-            "Скасоване": COLORS["error"],
-            "Готується": COLORS["status_yellow"],
-            "Виконане": COLORS["green"]
-        }
-
-        for row_index, order in enumerate(orders, start=1):
-            bg = (
-                COLORS["white"] if row_index % 2
-                else COLORS["alt_row"]
-            )
-
-            for col, value in enumerate(order):
-                ctk.CTkLabel(
-                    table,
-                    text=value,
-                    font=("Arial", 12),
-                    text_color=(
-                        status_colors.get(value, COLORS["navy"])
-                        if col == 4 else COLORS["navy"]
-                    ),
-                    fg_color=bg,
-                    height=38
-                ).grid(
-                    row=row_index,
-                    column=col,
-                    sticky="ew"
-                )
-
-   
+        render_home_page(content, app, current_role)
+    elif page == "Замовлення":
+        render_orders_page(content, app, current_role)
+    elif page == "Закупівлі":
+        render_procurement_page(content, app, current_role)
     elif page == "Меню":
-        render_menu_page(content, app, current_role)
+        if current_role == "admin":
+            render_menu_page(content, app, current_role)
+        else:
+            render_client_menu(content, app, cart, update_cart_label)
+    elif page == "Кошик":
+        render_cart(content, app, cart, customer_id, show_page, update_cart_label)
+    elif page == "Історія замовлень":
+        render_history(content, customer_id)
+    elif page == "Акаунт":
+        render_account(content, customer_id, update_current_login)
     elif page == "Інгредієнти":
         render_ingredients_page(content, app, current_role)
     elif page == "Користувачі":
@@ -291,6 +172,12 @@ def show_page(page):
 
 
 # Кнопки бокового меню — восстановлены
+def update_cart_label():
+    if "Кошик" in buttons:
+        count = sum(cart.values())
+        buttons["Кошик"].configure(text=f"Кошик ({count})" if count else "Кошик")
+
+
 for page in pages:
     button = ctk.CTkButton(
         sidebar,
@@ -328,18 +215,21 @@ admin_login = "admin"
 admin_password = "1234"
 
 
-def enter_app(role, username=None):
-    global current_role, current_user
+def enter_app(role, username=None, linked_customer=None):
+    global current_role, current_user, customer_id
     current_role = role
     current_user = username
+    customer_id = linked_customer
 
     # Показываем только доступные для роли разделы.
     for button in buttons.values():
         button.pack_forget()
 
-    for page in pages:
-        if role == "admin" or page not in admin_pages:
-            buttons[page].pack(fill="x", padx=12, pady=3)
+    visible = admin_page_names if role == "admin" else (
+        guest_page_names if role == "guest" else client_page_names)
+    for page in visible:
+        buttons[page].pack(fill="x", padx=12, pady=3)
+    update_cart_label()
 
     if role == "admin":
         role_label.configure(text="Адміністратор")
@@ -356,7 +246,11 @@ def check_user():
     username = login_entry.get().strip()
     password = password_entry.get()
 
-    if username in demo_users and demo_users[username] == password:
+    linked = authenticate(username, password)
+    if linked:
+        enter_app("user", username, linked)
+    elif username in demo_users and demo_users[username] == password:
+        # Старий демонстраційний логін не прив'язаний до клієнта з Excel.
         enter_app("user", username)
     else:
         error_label.configure(text="Невірний логін або пароль користувача")
@@ -370,6 +264,41 @@ def check_admin():
         enter_app("admin", username)
     else:
         error_label.configure(text="Невірні дані адміністратора")
+
+
+def open_registration():
+    dialog = ctk.CTkToplevel(app)
+    dialog.title("Реєстрація клієнта")
+    dialog.geometry("420x590")
+    dialog.transient(app)
+    body = ctk.CTkScrollableFrame(dialog)
+    body.pack(fill="both", expand=True, padx=15, pady=15)
+    ctk.CTkLabel(body, text="Створити акаунт", font=("Arial", 22, "bold")).pack(pady=10)
+    fields = {}
+    for key, title, secret in [
+        ("login", "Логін", False), ("password", "Пароль (від 6 символів)", True),
+        ("first", "Ім’я", False), ("last", "Прізвище", False),
+        ("phone", "Телефон", False), ("email", "Email", False),
+        ("address", "Адреса", False),
+    ]:
+        ctk.CTkLabel(body, text=title).pack(anchor="w", pady=(8, 0))
+        ent = ctk.CTkEntry(body, show="*" if secret else "")
+        ent.pack(fill="x")
+        fields[key] = ent
+    def submit():
+        try:
+            customer = register(
+                fields["login"].get(), fields["password"].get(),
+                fields["first"].get(), fields["last"].get(),
+                fields["phone"].get(), fields["email"].get(),
+                fields["address"].get())
+        except Exception as exc:
+            messagebox.showerror("Реєстрація", str(exc), parent=dialog)
+            return
+        username = fields["login"].get().strip()
+        dialog.destroy()
+        enter_app("user", username, customer)
+    ctk.CTkButton(body, text="Зареєструватися", command=submit).pack(pady=20)
 
 
 # Экран входа поверх основного интерфейса.
@@ -452,6 +381,12 @@ ctk.CTkButton(
     hover_color=COLORS["header"],
     command=lambda: enter_app("guest")
 ).pack(pady=9)
+
+ctk.CTkButton(
+    login_card, text="Створити акаунт", width=300,
+    fg_color="transparent", text_color=COLORS["navy"],
+    command=open_registration
+).pack(pady=(0, 3))
 
 # Кнопка администратора находится в нижнем правом углу всего окна.
 # Она проверяет логин и пароль из тех же полей.

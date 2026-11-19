@@ -14,10 +14,12 @@ from ui.theme import COLORS, MENU_CATEGORIES, format_price, format_quantity
 
 
 def render_menu_page(content, app, role):
-    is_admin = role == "admin"
+    is_admin = role in ("admin", "moderator")
+    can_create_delete = role == "admin"
 
     heading = ctk.CTkFrame(content, fg_color="transparent")
-    heading.pack(fill="x", padx=22, pady=(0, 12))
+    if can_create_delete:
+        heading.pack(fill="x", padx=22, pady=(0, 12))
 
     filters = ctk.CTkFrame(content, fg_color="transparent")
     filters.pack(fill="x", padx=22, pady=(0, 9))
@@ -26,16 +28,16 @@ def render_menu_page(content, app, role):
     )
     search.pack(side="left", fill="x", expand=True, padx=(0, 8))
     categories = ctk.CTkOptionMenu(
-        filters, width=140, height=36,
+        filters, button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", width=140, height=36,
         values=["Усі категорії"] + MENU_CATEGORIES,
-        fg_color=COLORS["blue"], button_color=COLORS["navy"],
+        fg_color=COLORS["navy"], button_color=COLORS["navy"],
     )
     categories.pack(side="left", padx=(0, 8))
     categories.set("Усі категорії")
     statuses = ctk.CTkOptionMenu(
-        filters, width=150, height=36,
+        filters, button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", width=150, height=36,
         values=["Усі стани", "Можна готувати", "Бракує", "Склад не задано"],
-        fg_color=COLORS["blue"], button_color=COLORS["navy"],
+        fg_color=COLORS["navy"], button_color=COLORS["navy"],
     )
     statuses.pack(side="left")
     statuses.set("Усі стани")
@@ -159,19 +161,20 @@ def render_menu_page(content, app, role):
                 actions.grid_columnconfigure(0, weight=1)
                 actions.grid_columnconfigure(3, weight=1)
                 ctk.CTkButton(
-                    actions, text="Змінити", width=62, height=30,
-                    fg_color=COLORS["blue"], hover_color=COLORS["blue_hover"],
+                    actions, text_color="white", border_color=COLORS["navy"], text="Змінити", width=62, height=30,
+                    fg_color=COLORS["navy"], hover_color=COLORS["blue"],
                     command=lambda pk=item["id"]: open_editor(pk),
                 ).grid(row=0, column=1, padx=(0, 3), pady=15)
-                ctk.CTkButton(
-                    actions, text="Видалити", width=64, height=30,
-                    fg_color=COLORS["soft_danger"], text_color=COLORS["red"],
-                    hover_color=COLORS["hover_danger"],
-                    command=lambda pk=item["id"]: delete_item(pk),
-                ).grid(row=0, column=2, padx=(3, 0), pady=15)
+                if can_create_delete:
+                    ctk.CTkButton(
+                        actions, border_color=COLORS["red"], text="Видалити", width=64, height=30,
+                        fg_color=COLORS["red"], text_color="white",
+                        hover_color=COLORS["error"],
+                        command=lambda pk=item["id"]: delete_item(pk),
+                    ).grid(row=0, column=2, padx=(3, 0), pady=15)
 
     def delete_item(pk):
-        if not is_admin:
+        if not can_create_delete:
             return
         item = get_menu_catalog_item(pk)
         if item and messagebox.askyesno(
@@ -184,7 +187,7 @@ def render_menu_page(content, app, role):
                 messagebox.showerror("Помилка бази", str(exc), parent=app)
 
     def open_editor(pk=None):
-        if not is_admin:
+        if not is_admin or (pk is None and not can_create_delete):
             return
         try:
             item = get_menu_catalog_item(pk) if pk is not None else None
@@ -221,8 +224,8 @@ def render_menu_page(content, app, role):
             anchor="w", padx=16,
         )
         category = ctk.CTkOptionMenu(
-            scroll, values=MENU_CATEGORIES, height=35,
-            fg_color=COLORS["blue"], button_color=COLORS["navy"],
+            scroll, button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=MENU_CATEGORIES, height=35,
+            fg_color=COLORS["navy"], button_color=COLORS["navy"],
         )
         category.pack(fill="x", padx=16, pady=(3, 11))
         price = field("Ціна, грн", "Наприклад, 220")
@@ -269,13 +272,13 @@ def render_menu_page(content, app, role):
             refresh_photo()
 
         ctk.CTkButton(
-            photo_buttons, text="Обрати фото", height=30, width=110,
-            fg_color=COLORS["blue"], command=select_photo,
+            photo_buttons, hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text="Обрати фото", height=30, width=110,
+            fg_color=COLORS["navy"], command=select_photo,
         ).pack(side="left", padx=(0, 5))
         ctk.CTkButton(
-            photo_buttons, text="Прибрати", height=30, width=93,
-            fg_color=COLORS["soft_button"], text_color=COLORS["text"],
-            hover_color=COLORS["hover_button"], command=clear_photo,
+            photo_buttons, border_color=COLORS["navy"], text="Прибрати", height=30, width=93,
+            fg_color=COLORS["navy"], text_color="white",
+            hover_color=COLORS["blue"], command=clear_photo,
         ).pack(side="left")
         refresh_photo()
 
@@ -314,10 +317,10 @@ def render_menu_page(content, app, role):
             for candidate in matches:
                 ctk.CTkButton(
                     suggestion_frame,
-                    text=f"{candidate['name']} ({candidate['unit']})",
+                    border_color=COLORS["navy"], text=f"{candidate['name']} ({candidate['unit']})",
                     anchor="w", height=28,
-                    fg_color=COLORS["header"], text_color=COLORS["text"],
-                    hover_color=COLORS["hover_button"],
+                    fg_color=COLORS["navy"], text_color="white",
+                    hover_color=COLORS["blue"],
                     command=lambda ing=candidate: add_component(ing),
                 ).pack(fill="x", padx=3, pady=1)
 
@@ -347,9 +350,9 @@ def render_menu_page(content, app, role):
                 text_color=COLORS["muted"], font=("Arial", 11),
             ).pack(side="left", padx=(0, 3))
             ctk.CTkButton(
-                frame, text="×", width=30, height=30,
-                fg_color=COLORS["soft_danger"], text_color=COLORS["red"],
-                hover_color=COLORS["hover_danger"],
+                frame, border_color=COLORS["navy"], text="×", width=30, height=30,
+                fg_color=COLORS["navy"], text_color="white",
+                hover_color=COLORS["blue"],
                 command=lambda: remove_component(ing_id),
             ).pack(side="left", padx=(0, 4))
             chosen[ing_id] = {"frame": frame, "entry": quantity, "ingredient": ingredient}
@@ -418,21 +421,21 @@ def render_menu_page(content, app, role):
         buttons = ctk.CTkFrame(dialog, fg_color="transparent")
         buttons.pack(fill="x", padx=18, pady=(0, 14))
         ctk.CTkButton(
-            buttons, text="Скасувати", height=36,
-            fg_color=COLORS["soft_button"], text_color=COLORS["text"],
-            hover_color=COLORS["hover_button"], command=dialog.destroy,
+            buttons, border_color=COLORS["navy"], text="Скасувати", height=36,
+            fg_color=COLORS["navy"], text_color="white",
+            hover_color=COLORS["blue"], command=dialog.destroy,
         ).pack(side="left", fill="x", expand=True, padx=(0, 6))
         ctk.CTkButton(
-            buttons, text="Зберегти", height=36,
+            buttons, text_color="white", border_color=COLORS["navy"], text="Зберегти", height=36,
             fg_color=COLORS["navy"], hover_color=COLORS["blue"],
             command=save,
         ).pack(side="left", fill="x", expand=True, padx=(6, 0))
         dialog.after(100, lambda: dialog.grab_set() if dialog.winfo_exists() else None)
         name.focus_set()
 
-    if is_admin:
+    if can_create_delete:
         ctk.CTkButton(
-            heading, text="+ Додати позицію", width=160, height=36,
+            heading, text_color="white", border_color=COLORS["navy"], text="+ Додати позицію", width=160, height=36,
             fg_color=COLORS["navy"], hover_color=COLORS["blue"],
             command=open_editor,
         ).pack(side="right")

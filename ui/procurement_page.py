@@ -20,8 +20,8 @@ def render_procurement_page(content,app,role):
                                 fg_color=COLORS['header'],selected_color=COLORS['blue'],
                                 selected_hover_color=COLORS['blue_hover'])
     mode.pack(side='left')
-    new_button=ctk.CTkButton(top,text='+ Нова закупівля',width=175,height=36,
-                             fg_color=COLORS['blue'],hover_color=COLORS['blue_hover'])
+    new_button=ctk.CTkButton(top,text_color="white", border_color=COLORS["navy"], text='+ Нова закупівля',width=175,height=36,
+                             fg_color=COLORS["navy"],hover_color=COLORS["blue"])
     new_button.pack(side='right')
     search=ctk.CTkEntry(content,height=37,placeholder_text='Пошук за ID, назвою, датою або інгредієнтом')
     search.pack(fill='x',padx=30,pady=(0,6))
@@ -57,12 +57,12 @@ def render_procurement_page(content,app,role):
         frame.grid(row=row,column=col,sticky='nsew',padx=2,pady=2)
         frame.grid_columnconfigure(0,weight=1)
         frame.grid_columnconfigure(3,weight=1)
-        edit=ctk.CTkButton(frame,text='Змінити',width=63,height=29,
-            fg_color=COLORS['blue'],hover_color=COLORS['blue_hover'],command=first)
+        edit=ctk.CTkButton(frame,text_color="white", border_color=COLORS["navy"], text='Змінити',width=63,height=29,
+            fg_color=COLORS["navy"],hover_color=COLORS["blue"],command=first)
         edit.grid(row=0,column=1,padx=(0,3),pady=15)
-        delete=ctk.CTkButton(frame,text='Видалити',width=70,height=29,
-            fg_color=COLORS['soft_danger'],text_color=COLORS['red'],
-            hover_color=COLORS['hover_danger'],command=second)
+        delete=ctk.CTkButton(frame,border_color=COLORS["red"], text='Видалити',width=70,height=29,
+            fg_color=COLORS["red"],text_color="white",
+            hover_color=COLORS["error"],command=second)
         delete.grid(row=0,column=2,padx=(3,0),pady=15)
         for el in [frame,edit,delete]:table.enable_wheel(el)
 
@@ -133,7 +133,7 @@ def render_procurement_page(content,app,role):
             except (ValueError,sqlite3.Error) as exc:
                 feedback.configure(text=str(exc));return
             dialog.destroy();refresh()
-        ctk.CTkButton(body,text='Зберегти',command=save,fg_color=COLORS['blue']).pack(pady=10)
+        ctk.CTkButton(body,hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='Зберегти',command=save,fg_color=COLORS["navy"]).pack(pady=10)
         dialog.grab_set()
 
     def remove_supplier(pk):
@@ -162,7 +162,7 @@ def render_procurement_page(content,app,role):
             font=('Arial',20,'bold'),text_color=COLORS['navy']).pack(anchor='w',padx=17,pady=(10,12))
         ctk.CTkLabel(frame,text='Постачальник',text_color=COLORS['navy']).pack(anchor='w',padx=17)
         supplier_labels={f"{s['supplier_id']} — {s['name']}":s['supplier_id'] for s in suppliers}
-        supplier_box=ctk.CTkOptionMenu(frame,values=list(supplier_labels),fg_color=COLORS['blue'])
+        supplier_box=ctk.CTkOptionMenu(frame,button_color=COLORS["navy"], button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=list(supplier_labels),fg_color=COLORS["navy"])
         supplier_box.pack(fill='x',padx=17,pady=(3,10))
         if existing:
             supplier_box.set(next(label for label,sid in supplier_labels.items() if sid==existing['supplier_id']))
@@ -180,8 +180,8 @@ def render_procurement_page(content,app,role):
         def add_line(ing_id=None,quantity='1',price=None):
             holder=ctk.CTkFrame(list_frame,fg_color='transparent')
             holder.pack(fill='x',padx=8,pady=6)
-            ing_box=ctk.CTkOptionMenu(holder,values=list(ingredient_labels),width=310,
-                fg_color=COLORS['blue'],button_color=COLORS['navy'])
+            ing_box=ctk.CTkOptionMenu(holder,button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=list(ingredient_labels),width=310,
+                fg_color=COLORS["navy"],button_color=COLORS["navy"])
             ing_box.pack(side='left',fill='x',expand=True,padx=(0,7))
             if ing_id in by_id:ing_box.set(by_id[ing_id])
             qty=ctk.CTkEntry(holder,width=90,placeholder_text='Кількість')
@@ -198,15 +198,15 @@ def render_procurement_page(content,app,role):
             lines.append(line)
             def remove_line():
                 lines.remove(line);holder.destroy()
-            ctk.CTkButton(holder,text='×',width=30,fg_color=COLORS['soft_danger'],
-                text_color=COLORS['red'],hover_color=COLORS['hover_danger'],
+            ctk.CTkButton(holder,border_color=COLORS["navy"], text='×',width=30,fg_color=COLORS["navy"],
+                text_color="white",hover_color=COLORS["blue"],
                 command=remove_line).pack(side='left')
         if existing:
             for line in existing['lines']:
                 add_line(line['ingredient_id'],str(line['quantity']),line['unit_price'])
         else:add_line()
-        ctk.CTkButton(frame,text='+ Додати інгредієнт',fg_color=COLORS['soft_button'],
-            text_color=COLORS['navy'],hover_color=COLORS['hover_button'],
+        ctk.CTkButton(frame,border_color=COLORS["navy"], text='+ Додати інгредієнт',fg_color=COLORS["navy"],
+            text_color="white",hover_color=COLORS["blue"],
             command=add_line).pack(anchor='w',padx=17,pady=(3,12))
         ctk.CTkLabel(frame,text='Примітка (необов’язково)',text_color=COLORS['navy']).pack(anchor='w',padx=17)
         note=ctk.CTkEntry(frame,height=35)
@@ -225,7 +225,7 @@ def render_procurement_page(content,app,role):
                 feedback.configure(text=str(exc));return
             dialog.destroy();refresh()
             messagebox.showinfo('Збережено',f'Закупівля {saved} збережена. Залишки оновлено.',parent=app)
-        ctk.CTkButton(frame,text='Зберегти закупівлю',fg_color=COLORS['blue'],
+        ctk.CTkButton(frame,hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='Зберегти закупівлю',fg_color=COLORS["navy"],
                       command=save).pack(pady=(8,16))
         dialog.grab_set()
 

@@ -11,7 +11,8 @@ from ui.theme import COLORS, format_price, format_quantity
 def render_ingredients_page(content, app, current_role):
     # Склад ингредиентов (SQLite). Только администратор видит этот раздел.
     heading = ctk.CTkFrame(content, fg_color="transparent")
-    heading.pack(fill="x", padx=30, pady=(0, 13))
+    if current_role == "admin":
+        heading.pack(fill="x", padx=30, pady=(0, 13))
 
     filters = ctk.CTkFrame(content, fg_color="transparent")
     filters.pack(fill="x", padx=30, pady=(0, 11))
@@ -20,9 +21,9 @@ def render_ingredients_page(content, app, current_role):
     )
     search_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
     status_filter = ctk.CTkOptionMenu(
-        filters, values=["Усі залишки", "Достатньо", "Мало", "Немає"],
-        width=160, height=38, fg_color=COLORS["blue"],
-        button_color=COLORS["navy"], button_hover_color=COLORS["blue_hover"]
+        filters, text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=["Усі залишки", "Достатньо", "Мало", "Немає"],
+        width=160, height=38, fg_color=COLORS["navy"],
+        button_color=COLORS["navy"], button_hover_color=COLORS["blue"]
     )
     status_filter.pack(side="right")
     status_filter.set("Усі залишки")
@@ -118,19 +119,24 @@ def render_ingredients_page(content, app, current_role):
                     fg_color=bg, height=44, width=1, anchor="center"
                 ).grid(row=row_index, column=col, sticky="ew", padx=2, pady=2)
 
+            if current_role != 'admin':
+                ctk.CTkLabel(ingredient_table, text='Перегляд', fg_color=bg,
+                    text_color=COLORS['muted'], height=44).grid(
+                        row=row_index, column=7, sticky='nsew', padx=2, pady=2)
+                continue
             actions = ctk.CTkFrame(ingredient_table, fg_color=bg, height=44)
             actions.grid(row=row_index, column=7, sticky="nsew", padx=2, pady=2)
             actions.grid_columnconfigure(0, weight=1)
             actions.grid_columnconfigure(3, weight=1)
             ctk.CTkButton(
-                actions, text="Змінити", width=62, height=29,
-                fg_color=COLORS["blue"], hover_color=COLORS["blue_hover"],
+                actions, text_color="white", border_color=COLORS["navy"], text="Змінити", width=62, height=29,
+                fg_color=COLORS["navy"], hover_color=COLORS["blue"],
                 command=lambda item_id=item["id"]: open_ingredient_editor(item_id)
             ).grid(row=0, column=1, padx=(0, 3), pady=6)
             ctk.CTkButton(
-                actions, text="Видалити", width=64, height=29,
-                fg_color=COLORS["soft_danger"], text_color=COLORS["red"],
-                hover_color=COLORS["hover_danger"],
+                actions, border_color=COLORS["red"], text="Видалити", width=64, height=29,
+                fg_color=COLORS["red"], text_color="white",
+                hover_color=COLORS["error"],
                 command=lambda item_id=item["id"]: delete_ingredient(item_id)
             ).grid(row=0, column=2, padx=(3, 0), pady=6)
 
@@ -198,8 +204,8 @@ def render_ingredients_page(content, app, current_role):
             form, text="Одиниця вимірювання", text_color=COLORS["body_heading"]
         ).pack(anchor="w", padx=20)
         unit_entry = ctk.CTkOptionMenu(
-            form, values=["кг", "л", "шт"], height=34,
-            fg_color=COLORS["blue"], button_color=COLORS["navy"]
+            form, button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=["кг", "л", "шт"], height=34,
+            fg_color=COLORS["navy"], button_color=COLORS["navy"]
         )
         unit_entry.pack(fill="x", padx=20, pady=(3, 9))
         quantity_entry = entry_field("Залишок на складі", "Наприклад, 2,5")
@@ -255,12 +261,12 @@ def render_ingredients_page(content, app, current_role):
         buttons_row = ctk.CTkFrame(form, fg_color="transparent")
         buttons_row.pack(fill="x", padx=20, pady=(0, 12))
         ctk.CTkButton(
-            buttons_row, text="Скасувати", height=36,
-            fg_color=COLORS["soft_button"], text_color=COLORS["navy"],
-            hover_color=COLORS["hover_button"], command=dialog.destroy
+            buttons_row, border_color=COLORS["navy"], text="Скасувати", height=36,
+            fg_color=COLORS["navy"], text_color="white",
+            hover_color=COLORS["blue"], command=dialog.destroy
         ).pack(side="left", fill="x", expand=True, padx=(0, 6))
         ctk.CTkButton(
-            buttons_row, text="Зберегти", height=36,
+            buttons_row, text_color="white", border_color=COLORS["navy"], text="Зберегти", height=36,
             fg_color=COLORS["navy"], hover_color=COLORS["blue"],
             command=save_ingredient
         ).pack(side="left", fill="x", expand=True, padx=(6, 0))
@@ -269,8 +275,9 @@ def render_ingredients_page(content, app, current_role):
         )
         name_entry.focus_set()
 
-    ctk.CTkButton(
-        heading, text="+ Додати інгредієнт", width=180, height=36,
+    if current_role == "admin":
+        ctk.CTkButton(
+            heading, text_color="white", border_color=COLORS["navy"], text="+ Додати інгредієнт", width=180, height=36,
         fg_color=COLORS["navy"], hover_color=COLORS["blue"],
         command=open_ingredient_editor
     ).pack(side="right")

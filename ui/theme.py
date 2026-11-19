@@ -2,7 +2,7 @@
 from decimal import Decimal
 
 COLORS = {
-    "navy": "#192B3A",
+    "navy": '#102039',
     "blue": "#365571",
     "blue_hover": "#2D455A",
     "background": "#F5F7FA",

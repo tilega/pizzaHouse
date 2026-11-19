@@ -175,7 +175,7 @@ class _ScrollTable:
         widget.bind('<Shift-MouseWheel>', self._wheel, add='+')
 
 def _render_people_page(content, app, role, kind):
-    if role != 'admin':
+    if role not in ('admin', 'moderator') or (kind == 'employee' and role != 'admin'):
         return
     is_customer = kind == 'customer'
     label = 'користувача' if is_customer else 'працівника'
@@ -263,24 +263,29 @@ def _render_people_page(content, app, role, kind):
             action_box.grid_columnconfigure(0, weight=1)
             action_box.grid_columnconfigure(3, weight=1)
             edit_button = ctk.CTkButton(
-                action_box, text='Змінити', width=65, height=28,
-                fg_color=COLORS['blue'], hover_color=COLORS['blue_hover'],
+                action_box, text_color="white", border_color=COLORS["navy"], text='Змінити', width=65, height=28,
+                fg_color=COLORS["navy"], hover_color=COLORS["blue"],
                 command=lambda record_id=person_id: open_editor(record_id),
             )
             edit_button.grid(row=0, column=1, pady=8, padx=(0, 3))
-            del_button = ctk.CTkButton(
-                action_box, text='Видалити', width=69, height=28,
-                fg_color=COLORS['soft_danger'], text_color=COLORS['red'],
-                hover_color=COLORS['hover_danger'],
-                command=lambda record_id=person_id: remove(record_id),
-            )
-            del_button.grid(row=0, column=2, pady=8, padx=(3, 0))
-            for w in (action_box, edit_button, del_button):
+            shown_widgets = [action_box, edit_button]
+            if role == 'admin':
+                del_button = ctk.CTkButton(
+                    action_box, border_color=COLORS["red"], text='Видалити', width=69, height=28,
+                    fg_color=COLORS["red"], text_color="white",
+                    hover_color=COLORS["error"],
+                    command=lambda record_id=person_id: remove(record_id),
+                )
+                del_button.grid(row=0, column=2, pady=8, padx=(3, 0))
+                shown_widgets.append(del_button)
+            for w in shown_widgets:
                 table.enable_wheel(w)
         table.inner.update_idletasks()
         table._resize_content()
 
     def remove(record_id):
+        if role != 'admin':
+            return
         try:
             person = get_record(record_id)
         except sqlite3.Error as exc:
@@ -384,20 +389,20 @@ def _render_people_page(content, app, role, kind):
         footer = ctk.CTkFrame(dlg, fg_color='transparent')
         footer.pack(fill='x', padx=16, pady=(5, 15))
         ctk.CTkButton(
-            footer, text='Скасувати', height=36,
-            fg_color=COLORS['soft_button'], text_color=COLORS['navy'],
-            hover_color=COLORS['hover_button'], command=dlg.destroy,
+            footer, border_color=COLORS["navy"], text='Скасувати', height=36,
+            fg_color=COLORS["navy"], text_color="white",
+            hover_color=COLORS["blue"], command=dlg.destroy,
         ).pack(side='left', fill='x', expand=True, padx=(0, 5))
         ctk.CTkButton(
-            footer, text='Зберегти', height=36,
-            fg_color=COLORS['navy'], hover_color=COLORS['blue'], command=save,
+            footer, text_color="white", border_color=COLORS["navy"], text='Зберегти', height=36,
+            fg_color=COLORS["navy"], hover_color=COLORS["blue"], command=save,
         ).pack(side='right', fill='x', expand=True, padx=(5, 0))
         dlg.after(100, lambda: dlg.grab_set() if dlg.winfo_exists() else None)
         entries['first_name'].focus_set()
 
     ctk.CTkButton(
-        heading, text='+ Додати ' + label, height=37, width=190,
-        fg_color=COLORS['navy'], hover_color=COLORS['blue'],
+        heading, text_color="white", border_color=COLORS["navy"], text='+ Додати ' + label, height=37, width=190,
+        fg_color=COLORS["navy"], hover_color=COLORS["blue"],
         command=open_editor,
     ).pack(side='right', padx=(10, 0))
     search.bind('<KeyRelease>', lambda _event: refresh())

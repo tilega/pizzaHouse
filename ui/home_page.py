@@ -9,7 +9,7 @@ from ui.theme import COLORS, format_price
 
 
 def render_home_page(content,app,role):
-    if role!='admin':return
+    if role not in ('admin','moderator'):return
     try:
         orders=order_dashboard_stats()
         people=people_counts()

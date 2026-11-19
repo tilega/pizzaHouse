@@ -6,25 +6,128 @@ import sqlite3
 from tkinter import messagebox
 import customtkinter as ctk
 
-from orders_db import list_orders,get_order,update_order_status,delete_order,ORDER_STATUSES
+from orders_db import list_orders,get_order,update_order_status,delete_order,create_order,ORDER_STATUSES
 from ui.people_page import _ScrollTable
 from ui.theme import COLORS,format_price
+from database import list_menu_catalog
+from people_db import list_customers
 
 
 def render_orders_page(content,app,role):
-    if role!='admin':
+    if role not in ('admin','moderator'):
         ctk.CTkLabel(content,text='Оформлення замовлення та кошик будуть додані пізніше.',
             font=('Arial',14),text_color=COLORS['muted']).pack(anchor='w',padx=30,pady=20)
         ctk.CTkLabel(content,text='Тут не показуються замовлення інших клієнтів.',
             font=('Arial',12),text_color=COLORS['muted']).pack(anchor='w',padx=30)
         return
 
+    def open_create_order():
+        dialog = ctk.CTkToplevel(app)
+        dialog.title('Нове замовлення')
+        dialog.geometry('610x740')
+        dialog.minsize(510, 540)
+        dialog.transient(app)
+        body = ctk.CTkScrollableFrame(dialog, fg_color='white')
+        body.pack(fill='both', expand=True, padx=12, pady=12)
+        ctk.CTkLabel(body, text='Створити замовлення', font=('Arial',21,'bold'),
+                     text_color=COLORS['navy']).pack(anchor='w', padx=14, pady=12)
+        customers = list_customers()
+        customer_labels = ['Гість (без акаунта)'] + [
+            f"{c['customer_id']} — {c['first_name']} {c['last_name']}" for c in customers]
+        _ = ctk.CTkLabel(body, text='Клієнт', text_color=COLORS['navy'])
+        _.pack(anchor='w', padx=14)
+        customer_select = ctk.CTkOptionMenu(body, fg_color=COLORS["navy"], button_color=COLORS["navy"], button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=customer_labels, width=400)
+        customer_select.pack(anchor='w', padx=14, pady=4)
+        def field(title, default=''):
+            ctk.CTkLabel(body, text=title, text_color=COLORS['navy']).pack(
+                anchor='w', padx=14, pady=(8,1))
+            e=ctk.CTkEntry(body, height=34)
+            e.pack(fill='x', padx=14)
+            if default: e.insert(0,default)
+            return e
+        name=field('Ім’я клієнта / контактна особа')
+        phone=field('Телефон')
+        address=field('Адреса доставки')
+        def fill_customer(value):
+            idx=customer_labels.index(value)
+            customer=customers[idx-1] if idx else None
+            for entry, val in [(name, f"{customer['first_name']} {customer['last_name']}" if customer else ''),
+                               (phone,customer['phone'] if customer else ''),
+                               (address,customer['address'] if customer else '')]:
+                entry.delete(0,'end');entry.insert(0,val or '')
+        customer_select.configure(command=fill_customer)
+        def option(title, values):
+            ctk.CTkLabel(body,text=title,text_color=COLORS['navy']).pack(
+                anchor='w',padx=14,pady=(9,1))
+            o=ctk.CTkOptionMenu(body,fg_color=COLORS["navy"], button_color=COLORS["navy"], button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=values)
+            o.pack(anchor='w',padx=14)
+            return o
+        delivery=option('Отримання',['Доставка','Самовивіз'])
+        payment=option('Оплата',['Готівка','Картка'])
+        ctk.CTkLabel(body,text='Товари',font=('Arial',16,'bold'),
+                     text_color=COLORS['navy']).pack(anchor='w',padx=14,pady=(15,6))
+        menu=list_menu_catalog()
+        if not menu:
+            ctk.CTkLabel(body,text='Меню порожнє').pack()
+            return
+        menu_labels=[f"{m['id']} — {m['name']} ({format_price(m['price'])})" for m in menu]
+        item_select=ctk.CTkOptionMenu(body,fg_color=COLORS["navy"], button_color=COLORS["navy"], button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=menu_labels,width=410)
+        item_select.pack(anchor='w',padx=14)
+        quantity=ctk.CTkEntry(body,placeholder_text='Кількість',width=100)
+        quantity.insert(0,'1');quantity.pack(anchor='w',padx=14,pady=6)
+        basket={}
+        summary=ctk.CTkLabel(body,text='Позицій немає',text_color=COLORS['navy'],
+                             justify='left',wraplength=490)
+        def update_summary():
+            total=sum(next(m['price'] for m in menu if m['id']==mid)*qty
+                      for mid,qty in basket.items())
+            parts=[f"{next(m['name'] for m in menu if m['id']==mid)} × {qty}"
+                   for mid,qty in basket.items()]
+            summary.configure(text='\n'.join(parts)+f'\nРазом: {format_price(total)}')
+        def add_item():
+            try:
+                qty=int(quantity.get())
+                if not 1 <= qty <= 100: raise ValueError()
+            except ValueError:
+                messagebox.showerror('Помилка','Кількість має бути від 1 до 100',parent=dialog)
+                return
+            mid=menu[menu_labels.index(item_select.get())]['id']
+            basket[mid]=basket.get(mid,0)+qty
+            update_summary()
+        def clear_items():
+            basket.clear();update_summary()
+        controls=ctk.CTkFrame(body,fg_color='transparent')
+        controls.pack(anchor='w',padx=14)
+        ctk.CTkButton(controls,fg_color=COLORS["navy"], hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='+ Додати товар',command=add_item).pack(side='left',padx=(0,8))
+        ctk.CTkButton(controls,hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='Очистити кошик',fg_color=COLORS["navy"],
+                      command=clear_items).pack(side='left')
+        summary.pack(anchor='w',padx=14,pady=12)
+        def save_order():
+            try:
+                idx=customer_labels.index(customer_select.get())
+                cid=customers[idx-1]['customer_id'] if idx else None
+                order_id=create_order(customer_id=cid,customer_name=name.get(),
+                    phone=phone.get(),address=address.get(),order_type=delivery.get(),
+                    payment_method=payment.get(),items=list(basket.items()))
+            except Exception as exc:
+                messagebox.showerror('Помилка створення',str(exc),parent=dialog)
+                return
+            dialog.destroy()
+            refresh()
+            messagebox.showinfo('Замовлення',f'Замовлення №{order_id} створено',parent=app)
+        ctk.CTkButton(body,fg_color=COLORS["navy"], hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='Зберегти замовлення',height=40,
+                      command=save_order).pack(anchor='w',padx=14,pady=(8,20))
+        dialog.grab_set()
+
+    ctk.CTkButton(content,fg_color=COLORS["navy"], hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='+ Створити замовлення',height=38,
+                  command=open_create_order).pack(anchor='e',padx=30,pady=(0,10))
+
     filters=ctk.CTkFrame(content,fg_color='transparent')
     filters.pack(fill='x',padx=30,pady=(0,8))
     search=ctk.CTkEntry(filters,placeholder_text='Пошук за ID, клієнтом, телефоном, стравами...',height=36)
     search.pack(side='left',fill='x',expand=True,padx=(0,9))
-    statuses=ctk.CTkOptionMenu(filters,values=['Усі стани']+ORDER_STATUSES,
-        fg_color=COLORS['blue'],button_color=COLORS['navy'],width=165)
+    statuses=ctk.CTkOptionMenu(filters,button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=['Усі стани']+ORDER_STATUSES,
+        fg_color=COLORS["navy"],button_color=COLORS["navy"],width=165)
     statuses.pack(side='right');statuses.set('Усі стани')
     counter=ctk.CTkLabel(content,text='',text_color=COLORS['muted'],font=('Arial',12))
     counter.pack(anchor='w',padx=30,pady=(0,8))
@@ -67,8 +170,8 @@ def render_orders_page(content,app,role):
                 text_color=COLORS['muted'],font=('Arial',11)).pack(anchor='w',padx=15,pady=8)
         ctk.CTkLabel(body,text='Статус замовлення',text_color=COLORS['navy'],
             font=('Arial',12,'bold')).pack(anchor='w',padx=16,pady=(10,4))
-        status=ctk.CTkOptionMenu(body,values=ORDER_STATUSES,
-            fg_color=COLORS['blue'],button_color=COLORS['navy'])
+        status=ctk.CTkOptionMenu(body,button_hover_color=COLORS["blue"], text_color="white", dropdown_fg_color=COLORS["navy"], dropdown_hover_color=COLORS["blue"], dropdown_text_color="white", values=ORDER_STATUSES,
+            fg_color=COLORS["navy"],button_color=COLORS["navy"])
         status.pack(fill='x',padx=16)
         status.set(order['status'])
         feedback=ctk.CTkLabel(body,text='',text_color=COLORS['red'])
@@ -78,11 +181,13 @@ def render_orders_page(content,app,role):
             except (ValueError,sqlite3.Error) as exc:
                 feedback.configure(text=str(exc));return
             dialog.destroy();refresh()
-        ctk.CTkButton(body,text='Зберегти статус',fg_color=COLORS['blue'],
+        ctk.CTkButton(body,hover_color=COLORS["blue"], text_color="white", border_color=COLORS["navy"], text='Зберегти статус',fg_color=COLORS["navy"],
                       command=save).pack(pady=(8,16))
         dialog.grab_set()
 
     def confirm_delete(order_id):
+        if role != 'admin':
+            return
         if not messagebox.askyesno(
             'Видалення замовлення',
             f'Видалити замовлення №{order_id} назавжди?\nЦю дію неможливо скасувати.',
@@ -137,15 +242,18 @@ def render_orders_page(content,app,role):
             cell.grid_propagate(False)
             buttons_row=ctk.CTkFrame(cell,fg_color='transparent')
             buttons_row.place(relx=0.5,rely=0.5,anchor='center')
-            btn=ctk.CTkButton(buttons_row,text='Деталі / статус',width=145,height=30,
-                font=('Arial',11),fg_color=COLORS['blue'],hover_color=COLORS['blue_hover'],
+            btn=ctk.CTkButton(buttons_row,text_color="white", border_color=COLORS["navy"], text='Деталі / статус',width=145,height=30,
+                font=('Arial',11),fg_color=COLORS["navy"],hover_color=COLORS["blue"],
                 command=lambda pk=order['order_id']:open_order(pk))
             btn.pack(side='left',padx=(0,6))
-            delete_btn=ctk.CTkButton(buttons_row,text='Видалити',width=95,height=30,
-                font=('Arial',11),fg_color=COLORS['red'],hover_color=COLORS['red'],
-                command=lambda pk=order['order_id']:confirm_delete(pk))
-            delete_btn.pack(side='left')
-            for w in [cell,buttons_row,btn,delete_btn]:table.enable_wheel(w)
+            visible_buttons=[cell,buttons_row,btn]
+            if role == 'admin':
+                delete_btn=ctk.CTkButton(buttons_row,text_color="white", border_color=COLORS["red"], text='Видалити',width=95,height=30,
+                    font=('Arial',11),fg_color=COLORS["red"],hover_color=COLORS["error"],
+                    command=lambda pk=order['order_id']:confirm_delete(pk))
+                delete_btn.pack(side='left')
+                visible_buttons.append(delete_btn)
+            for w in visible_buttons:table.enable_wheel(w)
         table.inner.update_idletasks();table._resize_content()
     search.bind('<KeyRelease>',refresh)
     statuses.configure(command=refresh)
